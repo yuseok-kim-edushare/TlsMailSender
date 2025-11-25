@@ -17,15 +17,18 @@ using System.Net.Mail;
 using System.Net.Security;
 using System.Security.Cryptography.X509Certificates;
 using System.Reflection;
+using System.Runtime.InteropServices;
 
 namespace SimpleNetMail
 {
     /// <summary>
-    /// PowerBuilder 2019 R3에서 Import .NET Assembly 기능으로 생성한 
-    /// DotNetObject로 호출할 수 있는 메일 발송 클래스입니다.
+    /// PowerBuilder에서 .NET Assembly Import 또는 COM 방식으로 호출할 수 있는 메일 발송 클래스입니다.
     /// SMTP 포트 25를 사용하여 STARTTLS(=TLS) 연결을 수행합니다.
     /// 인증서 검증: 시스템 기본 검증을 따르되, AllowedCerts.txt에 등록된 지문은 예외 허용.
     /// </summary>
+    [ComVisible(true)]
+    [Guid("31ABF072-3366-44CF-8220-467B95BF08B3")]
+    [ClassInterface(ClassInterfaceType.None)]
     public class MailSender
     {
         // 허용된 인증서 지문 목록 (대문자, 공백/콜론 제거된 형태)
