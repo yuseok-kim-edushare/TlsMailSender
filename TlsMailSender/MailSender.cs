@@ -1,7 +1,7 @@
 ﻿// ─────────────────────────────────────────────────────────────────────────────
 // File   : MailSender.cs
-// Project: SimpleNetMail (Class Library, .NET Framework 4.8, x86)
-// Purpose: PowerBuilder 2019 R3에서 .NET Assembly Import로 바로 호출 가능한 
+// Project: TlsMailSender (Class Library, .NET Framework 4.8, AnyCPU/MSIL)
+// Purpose: PowerBuilder에서 .NET Assembly Import 또는 COM 방식으로 호출 가능한 
 //          TLS(STARTTLS) 메일 발송 기능 (첨부파일 지원 포함, 포트 25)
 //          인증서 검증: 시스템 기본 검증 + 화이트리스트 기반 예외 허용
 // Author : 
@@ -219,7 +219,7 @@ namespace SimpleNetMail
         /// <summary>
         /// STARTTLS(=TLS) 연결을 지원하는 SMTP 서버로 메일을 발송합니다.
         /// PowerBuilder에서 string[] attachments 배열을 넘겨 첨부파일을 지정할 수 있습니다.
-        /// 인증서 검증은 모두 생략되며, 사설 인증서도 오류 없이 통과합니다.
+        /// 인증서 검증: 시스템 기본 검증을 수행하며, AllowedCerts.txt에 등록된 지문은 예외적으로 허용합니다.
         /// </summary>
         /// <param name="smtpServer">
         /// SMTP 서버 주소 (예: "smtp.example.com"). 
@@ -241,7 +241,7 @@ namespace SimpleNetMail
         /// 받는 사람 이메일. 여러 명일 경우 ";" 또는 "," 로 구분 (예: "a@domain.com;b@domain.com").
         /// </param>
         /// <param name="subject">메일 제목 (예: "테스트 메일")</param>
-        /// <param name="body">메일 본문 (Plain Text). HTML을 원하면 IsBodyHtml을 true로 바꿔 주세요.</param>
+        /// <param name="body">메일 본문 (HTML 형식). IsBodyHtml이 true로 설정되어 있습니다.</param>
         /// <param name="attachments">
         /// 첨부파일 경로 배열 (PowerBuilder에서 string[] 형태로 만들어서 넘김). 
         /// 배열이 null이거나 길이가 0이면 첨부 없음.
@@ -288,7 +288,7 @@ namespace SimpleNetMail
                     // 4) 제목/본문 설정
                     message.Subject = subject ?? string.Empty;
                     message.Body = body ?? string.Empty;
-                    message.IsBodyHtml = true; // HTML 메일 전송을 원하면 true로 변경
+                    message.IsBodyHtml = true; // HTML 메일로 전송됩니다
 
                     // 5) 첨부파일 처리
                     if (attachments != null && attachments.Length > 0)
@@ -360,7 +360,7 @@ namespace SimpleNetMail
         /// <summary>
         /// STARTTLS(=TLS) 연결을 지원하는 SMTP 서버로 메일을 발송합니다. 별칭(표시 이름)을 지원합니다.
         /// PowerBuilder에서 string[] attachments 배열을 넘겨 첨부파일을 지정할 수 있습니다.
-        /// 인증서 검증은 모두 생략되며, 사설 인증서도 오류 없이 통과합니다.
+        /// 인증서 검증: 시스템 기본 검증을 수행하며, AllowedCerts.txt에 등록된 지문은 예외적으로 허용합니다.
         /// </summary>
         /// <param name="smtpServer">
         /// SMTP 서버 주소 (예: "smtp.example.com"). 
@@ -382,13 +382,13 @@ namespace SimpleNetMail
         /// 받는 사람 이메일. 여러 명일 경우 ";" 또는 "," 로 구분 (예: "a@domain.com;b@domain.com").
         /// </param>
         /// <param name="subject">메일 제목 (예: "테스트 메일")</param>
-        /// <param name="body">메일 본문 (Plain Text). HTML을 원하면 IsBodyHtml을 true로 바꿔 주세요.</param>
+        /// <param name="body">메일 본문 (HTML 형식). IsBodyHtml이 true로 설정되어 있습니다.</param>
         /// <param name="attachments">
         /// 첨부파일 경로 배열 (PowerBuilder에서 string[] 형태로 만들어서 넘김). 
         /// 배열이 null이거나 길이가 0이면 첨부 없음.
         /// </param>
-        /// <param name="fromDisplayName">보내는 사람 표시 이름</param>
-        /// <param name="toDisplayName">받는 사람 표시 이름</param>
+        /// <param name="fromDisplayName">보내는 사람 표시 이름 (선택 사항)</param>
+        /// <param name="toDisplayName">받는 사람 표시 이름 (선택 사항, 여러 명일 경우 세미콜론으로 구분)</param>
         /// <returns>성공 시 true, 실패 시 false</returns>
         public bool SendMailWithAlias(
             string smtpServer,
@@ -418,7 +418,7 @@ namespace SimpleNetMail
                 {
                     message.From = string.IsNullOrWhiteSpace(fromDisplayName) ? new MailAddress(from) : new MailAddress(from, fromDisplayName);
 
-                    // 3) Receiving recipient(s) (To) setting
+                    // 3) 받는 사람(To) 설정
                     if (!string.IsNullOrWhiteSpace(to))
                     {
                         string[] recipients = to
@@ -442,10 +442,10 @@ namespace SimpleNetMail
                         }
                     }
 
-                    // 4) Title/Body setting
+                    // 4) 제목/본문 설정
                     message.Subject = subject ?? string.Empty;
                     message.Body = body ?? string.Empty;
-                    message.IsBodyHtml = true; // HTML 메일 전송을 원하면 true로 변경
+                    message.IsBodyHtml = true; // HTML 메일로 전송됩니다
 
                     // 5) 첨부파일 처리
                     if (attachments != null && attachments.Length > 0)
