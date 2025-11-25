@@ -264,10 +264,12 @@ namespace SimpleNetMail
             {
 
 
-                // ── ❷ 인증서 검증: 시스템 검증 + 화이트리스트 기반 예외 허용 ───────────────
+                // ── TLS 사용 시 인증서 검증: 시스템 검증 + 화이트리스트 기반 예외 허용 ───────────────
                 // - 정상 인증서: 시스템 검증 통과 시 허용
                 // - 사설 인증서: AllowedCerts.txt에 지문 등록 시 허용
-                EnsureCertificateValidationCallback();
+                if (useTLS) {
+                    EnsureCertificateValidationCallback();
+                }
 
                 // 2) MailMessage 객체 생성 및 기본 설정
                 using (MailMessage message = new MailMessage())
@@ -408,10 +410,12 @@ namespace SimpleNetMail
             try
             {
 
-                // ── ❷ 인증서 검증: 시스템 검증 + 화이트리스트 기반 예외 허용 ───────────────
+                // ── TLS 사용 시 인증서 검증: 시스템 검증 + 화이트리스트 기반 예외 허용 ───────────────
                 // - 정상 인증서: 시스템 검증 통과 시 허용
                 // - 사설 인증서: AllowedCerts.txt에 지문 등록 시 허용
-                EnsureCertificateValidationCallback();
+                if (useTLS) {
+                    EnsureCertificateValidationCallback();
+                }
 
                 // 2) MailMessage 객체 생성 및 기본 설정
                 using (MailMessage message = new MailMessage())
