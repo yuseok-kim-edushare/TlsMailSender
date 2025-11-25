@@ -2,28 +2,217 @@
 // File   : MailSender.cs
 // Project: SimpleNetMail (Class Library, .NET Framework 4.8, x86)
 // Purpose: PowerBuilder 2019 R3에서 .NET Assembly Import로 바로 호출 가능한 
-//          TLS(STARTTLS) 메일 발송 기능 (첨부파일 지원 포함, 포트 25, 인증서 검증 생략)
+//          TLS(STARTTLS) 메일 발송 기능 (첨부파일 지원 포함, 포트 25)
+//          인증서 검증: 시스템 기본 검증 + 화이트리스트 기반 예외 허용
 // Author : 
 // Date   : 2025-06-02
 // ─────────────────────────────────────────────────────────────────────────────
 
 using System;
+using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Net;
 using System.Net.Mail;
 using System.Net.Security;
 using System.Security.Cryptography.X509Certificates;
+using System.Reflection;
 
 namespace SimpleNetMail
 {
     /// <summary>
     /// PowerBuilder 2019 R3에서 Import .NET Assembly 기능으로 생성한 
     /// DotNetObject로 호출할 수 있는 메일 발송 클래스입니다.
-    /// SMTP 포트 25를 사용하여 STARTTLS(=TLS) 연결을 수행하고,
-    /// 서버 인증서를 검증하지 않도록 설정되어 있습니다.
+    /// SMTP 포트 25를 사용하여 STARTTLS(=TLS) 연결을 수행합니다.
+    /// 인증서 검증: 시스템 기본 검증을 따르되, AllowedCerts.txt에 등록된 지문은 예외 허용.
     /// </summary>
     public class MailSender
     {
+        // 허용된 인증서 지문 목록 (대문자, 공백/콜론 제거된 형태)
+        private static HashSet<string> _allowedThumbprints = null;
+        private static readonly object _lockObj = new object();
+        private static bool _callbackRegistered = false;
+
+        /// <summary>
+        /// 설정 파일에서 허용된 인증서 지문 목록을 로드합니다.
+        /// 파일 위치: DLL과 같은 폴더의 AllowedCerts.txt
+        /// 형식: 한 줄에 하나의 지문 (SHA-1 또는 SHA-256), #으로 시작하면 주석
+        /// </summary>
+        private static HashSet<string> LoadAllowedThumbprints()
+        {
+            var thumbprints = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            try
+            {
+                // DLL이 위치한 폴더에서 설정 파일 찾기
+                string assemblyPath = Assembly.GetExecutingAssembly().Location;
+                string configPath = Path.Combine(Path.GetDirectoryName(assemblyPath), "AllowedCerts.txt");
+
+                LogStatic($"[화이트리스트] DLL 경로: {assemblyPath}");
+                LogStatic($"[화이트리스트] 설정 파일 경로: {configPath}");
+
+                if (File.Exists(configPath))
+                {
+                    LogStatic($"[화이트리스트] 설정 파일 발견, 로딩 중...");
+                    
+                    foreach (string line in File.ReadAllLines(configPath))
+                    {
+                        string trimmed = line.Trim();
+
+                        // 빈 줄이나 주석은 건너뜀
+                        if (string.IsNullOrEmpty(trimmed) || trimmed.StartsWith("#"))
+                            continue;
+
+                        // 지문 정규화: 공백, 콜론, 하이픈 제거 후 대문자로
+                        string normalized = trimmed
+                            .Replace(" ", "")
+                            .Replace(":", "")
+                            .Replace("-", "")
+                            .ToUpperInvariant();
+
+                        if (normalized.Length > 0)
+                        {
+                            thumbprints.Add(normalized);
+                            LogStatic($"[화이트리스트] 지문 등록: {normalized}");
+                        }
+                    }
+                    
+                    LogStatic($"[화이트리스트] 총 {thumbprints.Count}개 지문 로딩 완료");
+                }
+                else
+                {
+                    LogStatic($"[화이트리스트] 설정 파일 없음 - 시스템 검증만 사용");
+                }
+            }
+            catch (Exception ex)
+            {
+                LogStatic($"[화이트리스트] 로딩 실패: {ex.Message}");
+                // 설정 파일 로드 실패 시 빈 목록 사용 (시스템 검증만 수행)
+            }
+
+            return thumbprints;
+        }
+
+        /// <summary>
+        /// 허용된 지문 목록을 가져옵니다 (lazy loading, thread-safe)
+        /// </summary>
+        private static HashSet<string> AllowedThumbprints
+        {
+            get
+            {
+                if (_allowedThumbprints == null)
+                {
+                    lock (_lockObj)
+                    {
+                        if (_allowedThumbprints == null)
+                        {
+                            _allowedThumbprints = LoadAllowedThumbprints();
+                        }
+                    }
+                }
+                return _allowedThumbprints;
+            }
+        }
+
+        /// <summary>
+        /// 허용된 인증서 목록을 다시 로드합니다.
+        /// 설정 파일 변경 후 호출하면 새 목록이 적용됩니다.
+        /// </summary>
+        public void ReloadAllowedCerts()
+        {
+            lock (_lockObj)
+            {
+                _allowedThumbprints = LoadAllowedThumbprints();
+            }
+        }
+
+        /// <summary>
+        /// 인증서 검증 콜백을 등록합니다.
+        /// </summary>
+        private static void EnsureCertificateValidationCallback()
+        {
+            if (!_callbackRegistered)
+            {
+                lock (_lockObj)
+                {
+                    if (!_callbackRegistered)
+                    {
+                        ServicePointManager.ServerCertificateValidationCallback = ValidateCertificate;
+                        _callbackRegistered = true;
+                    }
+                }
+            }
+        }
+
+        /// <summary>
+        /// 인증서 검증 로직:
+        /// 1. 화이트리스트에 있으면 → 무조건 허용 (시스템 검증 무시)
+        /// 2. 시스템 검증 통과(sslPolicyErrors == None) → 허용
+        /// 3. 그 외 → 거부
+        /// </summary>
+        private static bool ValidateCertificate(
+            object sender,
+            X509Certificate certificate,
+            X509Chain chain,
+            SslPolicyErrors sslPolicyErrors)
+        {
+            string thumbprint = null;
+            X509Certificate2 cert2 = null;
+
+            // 인증서 지문 추출
+            if (certificate != null)
+            {
+                cert2 = certificate as X509Certificate2 ?? new X509Certificate2(certificate);
+                thumbprint = cert2.Thumbprint; // 이미 대문자, 공백 없음
+            }
+
+            // 1. 화이트리스트 먼저 체크 - 등록된 지문이면 무조건 허용
+            if (thumbprint != null && AllowedThumbprints.Contains(thumbprint))
+            {
+                LogStatic($"[인증서 검증] 화이트리스트 허용: {thumbprint}");
+                return true;
+            }
+
+            // 2. 시스템 검증 통과 시 허용
+            if (sslPolicyErrors == SslPolicyErrors.None)
+            {
+                return true;
+            }
+
+            // 3. 둘 다 실패 - 상세 정보 로깅 후 거부
+            LogStatic($"=== 인증서 검증 실패 ===");
+            LogStatic($"인증서 지문: {thumbprint ?? "(없음)"}");
+            LogStatic($"SSL 정책 오류: {sslPolicyErrors}");
+            LogStatic($"화이트리스트 등록 여부: {(thumbprint != null ? (AllowedThumbprints.Contains(thumbprint) ? "등록됨" : "미등록") : "확인불가")}");
+            LogStatic($"화이트리스트 항목 수: {AllowedThumbprints.Count}");
+            
+            if (cert2 != null)
+            {
+                try
+                {
+                    LogStatic($"인증서 주체: {cert2.Subject ?? "(없음)"}");
+                    LogStatic($"인증서 발급자: {cert2.Issuer ?? "(없음)"}");
+                    LogStatic($"인증서 유효기간: {cert2.NotBefore:yyyy-MM-dd} ~ {cert2.NotAfter:yyyy-MM-dd}");
+                    LogStatic($"인증서 만료 여부: {(DateTime.Now > cert2.NotAfter ? "만료됨" : "유효함")}");
+                }
+                catch
+                {
+                    // 인증서 정보 읽기 실패 시 무시
+                }
+            }
+
+            if (chain != null && chain.ChainStatus != null && chain.ChainStatus.Length > 0)
+            {
+                LogStatic($"인증서 체인 상태:");
+                foreach (var status in chain.ChainStatus)
+                {
+                    LogStatic($"  - {status.Status}: {status.StatusInformation}");
+                }
+            }
+
+            return false;
+        }
+
         /// <summary>
         /// STARTTLS(=TLS) 연결을 지원하는 SMTP 서버로 메일을 발송합니다.
         /// PowerBuilder에서 string[] attachments 배열을 넘겨 첨부파일을 지정할 수 있습니다.
@@ -70,25 +259,12 @@ namespace SimpleNetMail
         {
             try
             {
-                // ── ❶ TLS 프로토콜 강제 설정 ──────────────────────────────────────────────
-                // .NET Framework 기본값에는 SSL3.0, TLS1.0, TLS1.1, TLS1.2 등이 포함될 수 있습니다.
-                // 여기서는 TLS1.2 이상만 허용하도록 명시적으로 설정했습니다.
-                ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12;
 
-                // ── ❷ 인증서 검증 생략(항상 true 반환) ────────────────────────────────────
-                // 사설(자체 서명) 인증서로도 연결이 이루어지도록, 
-                // 항상 true(검증 통과)만 반환합니다.
-                ServicePointManager.ServerCertificateValidationCallback =
-                    delegate (
-                        object sender,
-                        X509Certificate certificate,
-                        X509Chain chain,
-                        SslPolicyErrors sslPolicyErrors
-                    )
-                    {
-                        return true;  // 어떤 인증서이든 모두 허용
-                    };
-                // ────────────────────────────────────────────────────────────────────────
+
+                // ── ❷ 인증서 검증: 시스템 검증 + 화이트리스트 기반 예외 허용 ───────────────
+                // - 정상 인증서: 시스템 검증 통과 시 허용
+                // - 사설 인증서: AllowedCerts.txt에 지문 등록 시 허용
+                EnsureCertificateValidationCallback();
 
                 // 2) MailMessage 객체 생성 및 기본 설정
                 MailMessage message = new MailMessage();
@@ -149,8 +325,29 @@ namespace SimpleNetMail
             }
             catch (Exception ex)
             {
-                // 예외 발생 시 false 반환 (필요하다면 여기서 예외 메시지를 로깅)
-                Log($"예외 발생: {ex.Message}");
+                // 예외 발생 시 상세 정보 로깅
+                Log($"=== 메일 발송 실패 ===");
+                Log($"예외 타입: {ex.GetType().Name}");
+                Log($"예외 메시지: {ex.Message}");
+                
+                // Inner Exception이 있으면 함께 로깅
+                if (ex.InnerException != null)
+                {
+                    Log($"내부 예외 타입: {ex.InnerException.GetType().Name}");
+                    Log($"내부 예외 메시지: {ex.InnerException.Message}");
+                }
+                
+                // SMTP 연결 정보 로깅 (민감 정보 제외)
+                Log($"SMTP 서버: {smtpServer}:{smtpPort}");
+                Log($"TLS 사용: {useTLS}");
+                Log($"발신자: {from}");
+                Log($"수신자: {to}");
+                Log($"제목: {subject ?? "(없음)"}");
+                
+                // 스택 트레이스 로깅
+                Log($"예외 스택:");
+                Log(ex.StackTrace ?? "(스택 트레이스 없음)");
+                
                 return false;
             }
         }
@@ -205,25 +402,11 @@ namespace SimpleNetMail
         {
             try
             {
-                // ── ❶ TLS 프로토콜 강제 설정 ──────────────────────────────────────────────
-                // .NET Framework 기본값에는 SSL3.0, TLS1.0, TLS1.1, TLS1.2 등이 포함될 수 있습니다.
-                // 여기서는 TLS1.2 이상만 허용하도록 명시적으로 설정했습니다.
-                ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12;
 
-                // ── ❷ 인증서 검증 생략(항상 true 반환) ────────────────────────────────────
-                // 사설(자체 서명) 인증서로도 연결이 이루어지도록, 
-                // 항상 true(검증 통과)만 반환합니다.
-                ServicePointManager.ServerCertificateValidationCallback =
-                    delegate (
-                        object sender,
-                        X509Certificate certificate,
-                        X509Chain chain,
-                        SslPolicyErrors sslPolicyErrors
-                    )
-                    {
-                        return true;  // 어떤 인증서이든 모두 허용
-                    };
-                // ────────────────────────────────────────────────────────────────────────
+                // ── ❷ 인증서 검증: 시스템 검증 + 화이트리스트 기반 예외 허용 ───────────────
+                // - 정상 인증서: 시스템 검증 통과 시 허용
+                // - 사설 인증서: AllowedCerts.txt에 지문 등록 시 허용
+                EnsureCertificateValidationCallback();
 
                 // 2) MailMessage 객체 생성 및 기본 설정
                 MailMessage message = new MailMessage();
@@ -297,15 +480,57 @@ namespace SimpleNetMail
             }
             catch (Exception ex)
             {
-                // 예외 발생 시 false 반환 (필요하다면 여기서 예외 메시지를 로깅)
-                Log($"예외 발생: {ex.Message}");
+                // 예외 발생 시 상세 정보 로깅
+                Log($"=== 메일 발송 실패 ===");
+                Log($"예외 타입: {ex.GetType().Name}");
+                Log($"예외 메시지: {ex.Message}");
+                
+                // Inner Exception이 있으면 함께 로깅
+                if (ex.InnerException != null)
+                {
+                    Log($"내부 예외 타입: {ex.InnerException.GetType().Name}");
+                    Log($"내부 예외 메시지: {ex.InnerException.Message}");
+                }
+                
+                // SMTP 연결 정보 로깅 (민감 정보 제외)
+                Log($"SMTP 서버: {smtpServer}:{smtpPort}");
+                Log($"TLS 사용: {useTLS}");
+                Log($"발신자: {from}");
+                Log($"수신자: {to}");
+                Log($"제목: {subject ?? "(없음)"}");
+                
+                // 스택 트레이스 로깅
+                Log($"예외 스택:");
+                Log(ex.StackTrace ?? "(스택 트레이스 없음)");
+                
                 return false;
             }
         }
 
         private void Log(string message)
         {
-            File.AppendAllText("C:\\temp\\TlsMailSender.log", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {message}\n");
+            LogStatic(message);
+        }
+
+        private static void LogStatic(string message)
+        {
+            try
+            {
+                string logPath = "C:\\temp\\TlsMailSender.log";
+                string logDir = Path.GetDirectoryName(logPath);
+                
+                // 로그 디렉터리가 없으면 생성
+                if (!string.IsNullOrEmpty(logDir) && !Directory.Exists(logDir))
+                {
+                    Directory.CreateDirectory(logDir);
+                }
+                
+                File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {message}\n");
+            }
+            catch
+            {
+                // 로그 파일 쓰기 실패 시 무시 (예외 전파 방지)
+            }
         }
     }
 }

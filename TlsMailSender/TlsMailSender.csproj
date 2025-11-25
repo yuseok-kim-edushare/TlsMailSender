@@ -9,6 +9,8 @@
     <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
   </PropertyGroup>
 
-  <!-- Standard .NET Framework assemblies are implicitly included with net481 -->
+  <ItemGroup>
+    <None Include="AllowedCerts.txt" />
+  </ItemGroup>
 
 </Project>
