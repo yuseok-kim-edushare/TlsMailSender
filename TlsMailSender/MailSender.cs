@@ -273,6 +273,7 @@ namespace SimpleNetMail
 
                 // 2) MailMessage 객체 생성 및 기본 설정
                 using (MailMessage message = new MailMessage())
+                using (Stream stream = new MemoryStream())
                 {
                     message.From = new MailAddress(from);
 
@@ -302,7 +303,7 @@ namespace SimpleNetMail
 
                             if (File.Exists(path))
                             {
-                                Attachment attach = new Attachment(path);
+                                Attachment attach = new Attachment(stream, path);
                                 message.Attachments.Add(attach);
                             }
                             else
@@ -419,6 +420,7 @@ namespace SimpleNetMail
 
                 // 2) MailMessage 객체 생성 및 기본 설정
                 using (MailMessage message = new MailMessage())
+                using (Stream stream = new MemoryStream())
                 {
                     message.From = string.IsNullOrWhiteSpace(fromDisplayName) ? new MailAddress(from) : new MailAddress(from, fromDisplayName);
 
@@ -461,7 +463,7 @@ namespace SimpleNetMail
 
                             if (File.Exists(path))
                             {
-                                Attachment attach = new Attachment(path);
+                                Attachment attach = new Attachment(stream, path);
                                 message.Attachments.Add(attach);
                             }
                             else
