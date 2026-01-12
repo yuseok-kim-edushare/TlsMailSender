@@ -361,8 +361,12 @@ namespace SimpleNetMail
                         try
                         {
                             // 1. 발신자 주소에서 도메인 추출
-                            string[] addressParts = from.Split('@');
-                            string domain = addressParts.Length > 1 ? addressParts[1] : "default.com";
+                            // message.From은 이미 MailAddress 객체로 생성되었으므로 Host 속성을 사용하면 
+                            // @ 뒤의 전체 문자열을 정확하게 가져옵니다 (a.co.kr 등 모든 형식 지원)
+                            string domain = message.From.Host;
+                            if (string.IsNullOrEmpty(domain)){
+                                throw new Exception("발신자 주소에서 도메인을 추출할 수 없습니다.");
+                            }
 
                             // 2. Message-ID 생성 및 강제 주입 (형식: <GUID@domain>)
                             string msgId = string.Format("<{0}@{1}>", Guid.NewGuid().ToString().Replace("-", ""), domain);
@@ -371,7 +375,7 @@ namespace SimpleNetMail
                             message.Headers.Set("Message-ID", msgId);
                             
                             // 디버깅을 위해 로그에 남김 (필요 시 주석 처리 가능)
-                            // Log($"Message-ID 주입: {msgId}");
+                            Log($"Message-ID 주입: {msgId}");
                         }
                         catch (Exception ex)
                         {
