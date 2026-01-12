@@ -51,12 +51,12 @@ namespace SimpleNetMail
                 string assemblyPath = Assembly.GetExecutingAssembly().Location;
                 string configPath = Path.Combine(Path.GetDirectoryName(assemblyPath), "AllowedCerts.txt");
 
-                LogStatic($"[화이트리스트] DLL 경로: {assemblyPath}");
-                LogStatic($"[화이트리스트] 설정 파일 경로: {configPath}");
+                // LogStatic($"[화이트리스트] DLL 경로: {assemblyPath}");
+                // LogStatic($"[화이트리스트] 설정 파일 경로: {configPath}");
 
                 if (File.Exists(configPath))
                 {
-                    LogStatic($"[화이트리스트] 설정 파일 발견, 로딩 중...");
+                    // LogStatic($"[화이트리스트] 설정 파일 발견, 로딩 중...");
                     
                     foreach (string line in File.ReadAllLines(configPath))
                     {
@@ -76,11 +76,11 @@ namespace SimpleNetMail
                         if (normalized.Length > 0)
                         {
                             thumbprints.Add(normalized);
-                            LogStatic($"[화이트리스트] 지문 등록: {normalized}");
+                            // LogStatic($"[화이트리스트] 지문 등록: {normalized}");
                         }
                     }
                     
-                    LogStatic($"[화이트리스트] 총 {thumbprints.Count}개 지문 로딩 완료");
+                    // LogStatic($"[화이트리스트] 총 {thumbprints.Count}개 지문 로딩 완료");
                 }
                 else
                 {
@@ -260,121 +260,11 @@ namespace SimpleNetMail
             string[] attachments
         )
         {
-            try
-            {
-
-
-                // ── TLS 사용 시 인증서 검증: 시스템 검증 + 화이트리스트 기반 예외 허용 ───────────────
-                // - 정상 인증서: 시스템 검증 통과 시 허용
-                // - 사설 인증서: AllowedCerts.txt에 지문 등록 시 허용
-                if (useTLS) {
-                    EnsureCertificateValidationCallback();
-                }
-
-                // 2) MailMessage 객체 생성 및 기본 설정
-                List<MemoryStream> attachmentStreams = new List<MemoryStream>();
-                try
-                {
-                    using (MailMessage message = new MailMessage())
-                    {
-                        message.From = new MailAddress(from);
-
-                        // 3) 받는 사람(To) 설정
-                        if (!string.IsNullOrWhiteSpace(to))
-                        {
-                            string[] recipients = to
-                                .Split(new char[] { ';', ',' }, StringSplitOptions.RemoveEmptyEntries);
-                            foreach (string addr in recipients)
-                            {
-                                message.To.Add(addr.Trim());
-                            }
-                        }
-
-                        // 4) 제목/본문 설정
-                        message.Subject = subject ?? string.Empty;
-                        message.Body = body ?? string.Empty;
-                        message.IsBodyHtml = true; // HTML 메일로 전송됩니다
-
-                        // 5) 첨부파일 처리 - 파일을 메모리 스트림에 명시적으로 로드
-                        if (attachments != null && attachments.Length > 0)
-                        {
-                            foreach (string path in attachments)
-                            {
-                                if (string.IsNullOrWhiteSpace(path))
-                                    continue;
-
-                                if (File.Exists(path))
-                                {
-                                    // 파일을 메모리 스트림에 명시적으로 로드
-                                    byte[] fileBytes = File.ReadAllBytes(path);
-                                    MemoryStream fileStream = new MemoryStream(fileBytes);
-                                    attachmentStreams.Add(fileStream); // 메일 발송 완료까지 유지
-                                    
-                                    Attachment attach = new Attachment(fileStream, Path.GetFileName(path));
-                                    message.Attachments.Add(attach);
-                                }
-                                else
-                                {
-                                    // 경로 오류나 파일이 없는 경우 무시
-                                    // (PB에서 사전에 경로 유효성 검사하는 것을 권장)
-                                    Log($"첨부파일을 찾을 수 없습니다: {path}");
-                                }
-                            }
-                        }
-
-                        // 6) SmtpClient 설정 및 메일 전송
-                        using (SmtpClient client = new SmtpClient(smtpServer, smtpPort))
-                        {
-                            // STARTTLS(=TLS) 사용 여부를 지정.
-                            // 포트 25, useTLS=true일 때, 서버가 EHLO 후 STARTTLS를 지원하면
-                            // 암호화 연결로 전환합니다.
-                            client.EnableSsl = useTLS;
-
-                            client.Credentials = new NetworkCredential(smtpUser, smtpPass);
-                            client.Timeout = 300_000; // 타임아웃 5분
-
-                            client.Send(message);
-                        }
-                    }
-                }
-                finally
-                {
-                    // 첨부파일 스트림 정리
-                    foreach (var stream in attachmentStreams)
-                    {
-                        stream?.Dispose();
-                    }
-                }
-
-                return true;
-            }
-            catch (Exception ex)
-            {
-                // 예외 발생 시 상세 정보 로깅
-                Log($"=== 메일 발송 실패 ===");
-                Log($"예외 타입: {ex.GetType().Name}");
-                Log($"예외 메시지: {ex.Message}");
-                
-                // Inner Exception이 있으면 함께 로깅
-                if (ex.InnerException != null)
-                {
-                    Log($"내부 예외 타입: {ex.InnerException.GetType().Name}");
-                    Log($"내부 예외 메시지: {ex.InnerException.Message}");
-                }
-                
-                // SMTP 연결 정보 로깅 (민감 정보 제외)
-                Log($"SMTP 서버: {smtpServer}:{smtpPort}");
-                Log($"TLS 사용: {useTLS}");
-                Log($"발신자: {from}");
-                Log($"수신자: {to}");
-                Log($"제목: {subject ?? "(없음)"}");
-                
-                // 스택 트레이스 로깅
-                Log($"예외 스택:");
-                Log(ex.StackTrace ?? "(스택 트레이스 없음)");
-                
-                return false;
-            }
+            return SendMailInternal(
+                smtpServer, smtpPort, smtpUser, smtpPass, useTLS,
+                from, to, subject, body, attachments,
+                null, null
+            );
         }
 
         /// <summary>
@@ -425,9 +315,33 @@ namespace SimpleNetMail
             string toDisplayName = null
         )
         {
+            return SendMailInternal(
+                smtpServer, smtpPort, smtpUser, smtpPass, useTLS,
+                from, to, subject, body, attachments,
+                fromDisplayName, toDisplayName
+            );
+        }
+
+        /// <summary>
+        /// 실제 메일 발송 로직을 수행하는 내부 메서드
+        /// </summary>
+        private bool SendMailInternal(
+            string smtpServer,
+            int smtpPort,
+            string smtpUser,
+            string smtpPass,
+            bool useTLS,
+            string from,
+            string to,
+            string subject,
+            string body,
+            string[] attachments,
+            string fromDisplayName,
+            string toDisplayName
+        )
+        {
             try
             {
-
                 // ── TLS 사용 시 인증서 검증: 시스템 검증 + 화이트리스트 기반 예외 허용 ───────────────
                 // - 정상 인증서: 시스템 검증 통과 시 허용
                 // - 사설 인증서: AllowedCerts.txt에 지문 등록 시 허용
@@ -442,6 +356,28 @@ namespace SimpleNetMail
                     using (MailMessage message = new MailMessage())
                     {
                         message.From = string.IsNullOrWhiteSpace(fromDisplayName) ? new MailAddress(from) : new MailAddress(from, fromDisplayName);
+
+                        // ── Message-ID 강제 주입 ─────────────────────────────
+                        try
+                        {
+                            // 1. 발신자 주소에서 도메인 추출
+                            string[] addressParts = from.Split('@');
+                            string domain = addressParts.Length > 1 ? addressParts[1] : "default.com";
+
+                            // 2. Message-ID 생성 및 강제 주입 (형식: <GUID@domain>)
+                            string msgId = string.Format("<{0}@{1}>", Guid.NewGuid().ToString().Replace("-", ""), domain);
+
+                            // Headers.Add가 아닌 Headers.Set을 사용하여 중복 방지
+                            message.Headers.Set("Message-ID", msgId);
+                            
+                            // 디버깅을 위해 로그에 남김 (필요 시 주석 처리 가능)
+                            // Log($"Message-ID 주입: {msgId}");
+                        }
+                        catch (Exception ex)
+                        {
+                            // ID 생성 실패 시에도 메일 발송 자체는 시도하도록 로그만 남기고 진행
+                            Log($"[Message-ID 생성 실패] {ex.Message}");
+                        }
 
                         // 3) 받는 사람(To) 설정
                         if (!string.IsNullOrWhiteSpace(to))
