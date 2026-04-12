@@ -2,4 +2,5 @@
   <Project Path="TlsMailSender/TlsMailSender.csproj">
     <BuildType Project="Release" />
   </Project>
+  <Project Path="TlsMailSender.Tests/TlsMailSender.Tests.csproj" />
 </Solution>
