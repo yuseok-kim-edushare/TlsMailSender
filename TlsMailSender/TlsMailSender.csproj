@@ -1,16 +1,21 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <!-- System.Memory: Span<T>/ReadOnlySpan<T>/MemoryExtensions(AsSpan) for net481 -->
-    <!-- System.Buffers: ArrayPool<T> — 첨부파일 버퍼 풀링으로 LOH 적재·heap 단편화 완화 -->
-    <!-- Microsoft.IO.RecyclableMemoryStream은 LOH 프로파일 결과로 필요 시 추가 -->
-
+    <!-- System.Memory : Span<T>/ReadOnlySpan<T>/AsSpan() — net481 BCL 미포함 -->
+    <!-- System.Buffers : ArrayPool<T> — 첨부파일 버퍼 풀링으로 LOH·단편화 완화 -->
     <TargetFramework>net481</TargetFramework>
     <OutputType>Library</OutputType>
     <RootNamespace>TlsMailSender</RootNamespace>
     <AssemblyName>TlsMailSender</AssemblyName>
     <ProjectGuid>{4EB9310A-F7B9-49B5-9BFB-235243010AD5}</ProjectGuid>
     <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+
+    <!--
+      Release 빌드에서만 NuGet 의존 DLL을 출력 폴더에 복사합니다.
+      Debug 빌드에서는 복사하지 않아 기존 동작을 유지합니다.
+      ILRepack이 $(OutputPath)에서 입력 파일을 읽으려면 이 플래그가 필요합니다.
+    -->
+    <CopyLocalLockFileAssemblies Condition="'$(Configuration)' == 'Release'">true</CopyLocalLockFileAssemblies>
   </PropertyGroup>
 
   <ItemGroup>
@@ -21,6 +26,51 @@
     <PackageReference Include="System.Memory" Version="4.6.3" />
     <PackageReference Include="System.Buffers" Version="4.6.1" />
     <PackageReference Include="System.Runtime.CompilerServices.Unsafe" Version="6.1.2" />
+
+    <!--
+      ILRepack : IncludeAssets=none → 빌드 참조(compile/runtime)에 추가하지 않음
+                 패키지 자체는 복원되어 $(PkgILRepack) 경로가 설정됩니다.
+                 PrivateAssets=all  → 이 프로젝트를 참조하는 상위 프로젝트에 전파하지 않음
+    -->
+    <PackageReference Include="ILRepack" Version="2.0.33">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>none</IncludeAssets>
+    </PackageReference>
   </ItemGroup>
+
+  <!--
+    [MergeAssemblies] Release 빌드 완료 후 NuGet 의존 어셈블리를 단일 DLL로 병합합니다.
+
+    목적 : PowerBuilder COM 배포 시 추가 DLL 없이 TlsMailSender.dll 하나만 배포합니다.
+    방법 : ILRepack /internalize — 병합된 타입을 internal로 제한해 COM 노출 표면을 유지합니다.
+    출력 : release-files\net481\TlsMailSender.dll  (빌드 출력과 별도)
+
+    병합 대상 (순서 중요 — 기본 어셈블리가 첫 번째):
+      1. TlsMailSender.dll         ← 기본(primary) 어셈블리
+      2. System.Memory.dll
+      3. System.Buffers.dll
+      4. System.Runtime.CompilerServices.Unsafe.dll
+  -->
+  <Target Name="MergeAssemblies" AfterTargets="Build" Condition="'$(Configuration)' == 'Release'">
+
+    <PropertyGroup>
+      <_ILRepackExe>$(PkgILRepack)\tools\ILRepack.exe</_ILRepackExe>
+      <_MergedDir>$(MSBuildThisFileDirectory)release-files\$(TargetFramework)\</_MergedDir>
+      <_MergedOut>$(_MergedDir)$(AssemblyName).dll</_MergedOut>
+    </PropertyGroup>
+
+    <Error Text="ILRepack.exe not found: $(_ILRepackExe). Run 'dotnet restore' first."
+           Condition="!Exists('$(_ILRepackExe)')" />
+
+    <MakeDir Directories="$(_MergedDir)" />
+
+    <Message Text="ILRepack: $(AssemblyName) + NuGet deps → $(_MergedOut)" Importance="high" />
+
+    <Exec
+      Command="&quot;$(_ILRepackExe)&quot; /internalize /copyattrs /out:&quot;$(_MergedOut)&quot; &quot;$(OutputPath)$(AssemblyName).dll&quot; &quot;$(OutputPath)System.Memory.dll&quot; &quot;$(OutputPath)System.Buffers.dll&quot; &quot;$(OutputPath)System.Runtime.CompilerServices.Unsafe.dll&quot;"
+      IgnoreExitCode="false" />
+
+    <Message Text="ILRepack: 완료 → $(_MergedOut)" Importance="high" />
+  </Target>
 
 </Project>
