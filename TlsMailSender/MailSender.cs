@@ -272,7 +272,63 @@ namespace SimpleNetMail
             return SendMailInternal(
                 smtpServer, smtpPort, smtpUser, smtpPass, useTLS,
                 from, to, subject, body, attachments,
-                null, null);
+                null, null, null
+            );
+        }
+
+        /// <summary>
+        /// STARTTLS(=TLS) 연결을 지원하는 SMTP 서버로 메일을 발송합니다. Reply-To를 지원합니다.
+        /// PowerBuilder에서 string[] attachments 배열을 넘겨 첨부파일을 지정할 수 있습니다.
+        /// 인증서 검증: 시스템 기본 검증을 수행하며, AllowedCerts.txt에 등록된 지문은 예외적으로 허용합니다.
+        /// </summary>
+        /// <param name="smtpServer">
+        /// SMTP 서버 주소 (예: "smtp.example.com"). 
+        /// 포트 25를 사용할 때는 해당 서버가 STARTTLS를 지원해야 합니다.
+        /// </param>
+        /// <param name="smtpPort">
+        /// SMTP 포트. 
+        /// 포트 25를 사용할 경우 STARTTLS 핸드셰이크가 수행됩니다 (EnableSsl=true).
+        /// 일반적으로 포트 587이나 465 대신, ISP/사내 환경에서 25번 포트를 사용할 때 이 파라미터를 25로 지정합니다.
+        /// </param>
+        /// <param name="smtpUser">SMTP 인증용 사용자 계정 (예: "user@example.com")</param>
+        /// <param name="smtpPass">SMTP 인증용 비밀번호 (앱 전용 비밀번호 권장)</param>
+        /// <param name="useTLS">
+        /// true로 설정 시 STARTTLS(=TLS) 연결을 시도합니다. 
+        /// false로 설정 시 암호화 없이 평문으로 전송되므로 보안상 권장되지 않습니다.
+        /// </param>
+        /// <param name="from">보내는 사람 이메일 주소 (예: "user@example.com")</param>
+        /// <param name="to">
+        /// 받는 사람 이메일. 여러 명일 경우 ";" 또는 "," 로 구분 (예: "a@domain.com;b@domain.com").
+        /// </param>
+        /// <param name="subject">메일 제목 (예: "테스트 메일")</param>
+        /// <param name="body">메일 본문 (HTML 형식). IsBodyHtml이 true로 설정되어 있습니다.</param>
+        /// <param name="attachments">
+        /// 첨부파일 경로 배열 (PowerBuilder에서 string[] 형태로 만들어서 넘김). 
+        /// 배열이 null이거나 길이가 0이면 첨부 없음.
+        /// </param>
+        /// <param name="replyTo">
+        /// Reply-To 주소(들). 여러 명일 경우 ";" 또는 "," 로 구분.
+        /// </param>
+        /// <returns>성공 시 true, 실패 시 false</returns>
+        public bool SendMailWithReplyTo(
+            string smtpServer,
+            int smtpPort,
+            string smtpUser,
+            string smtpPass,
+            bool useTLS,
+            string from,
+            string to,
+            string subject,
+            string body,
+            string[] attachments,
+            string replyTo
+        )
+        {
+            return SendMailInternal(
+                smtpServer, smtpPort, smtpUser, smtpPass, useTLS,
+                from, to, subject, body, attachments,
+                null, null, replyTo
+            );
         }
 
         /// <summary>
@@ -297,7 +353,65 @@ namespace SimpleNetMail
             return SendMailInternal(
                 smtpServer, smtpPort, smtpUser, smtpPass, useTLS,
                 from, to, subject, body, attachments,
-                fromDisplayName, toDisplayName);
+                fromDisplayName, toDisplayName, null
+            );
+        }
+
+        /// <summary>
+        /// STARTTLS(=TLS) 연결을 지원하는 SMTP 서버로 메일을 발송합니다. 별칭 및 Reply-To를 지원합니다.
+        /// PowerBuilder에서 string[] attachments 배열을 넘겨 첨부파일을 지정할 수 있습니다.
+        /// 인증서 검증: 시스템 기본 검증을 수행하며, AllowedCerts.txt에 등록된 지문은 예외적으로 허용합니다.
+        /// </summary>
+        /// <param name="smtpServer">
+        /// SMTP 서버 주소 (예: "smtp.example.com"). 
+        /// 포트 25를 사용할 때는 해당 서버가 STARTTLS를 지원해야 합니다.
+        /// </param>
+        /// <param name="smtpPort">
+        /// SMTP 포트. 
+        /// 포트 25를 사용할 경우 STARTTLS 핸드셰이크가 수행됩니다 (EnableSsl=true).
+        /// 일반적으로 포트 587이나 465 대신, ISP/사내 환경에서 25번 포트를 사용할 때 이 파라미터를 25로 지정합니다.
+        /// </param>
+        /// <param name="smtpUser">SMTP 인증용 사용자 계정 (예: "user@example.com")</param>
+        /// <param name="smtpPass">SMTP 인증용 비밀번호 (앱 전용 비밀번호 권장)</param>
+        /// <param name="useTLS">
+        /// true로 설정 시 STARTTLS(=TLS) 연결을 시도합니다. 
+        /// false로 설정 시 암호화 없이 평문으로 전송되므로 보안상 권장되지 않습니다.
+        /// </param>
+        /// <param name="from">보내는 사람 이메일 주소 (예: "user@example.com")</param>
+        /// <param name="to">
+        /// 받는 사람 이메일. 여러 명일 경우 ";" 또는 "," 로 구분 (예: "a@domain.com;b@domain.com").
+        /// </param>
+        /// <param name="subject">메일 제목 (예: "테스트 메일")</param>
+        /// <param name="body">메일 본문 (HTML 형식). IsBodyHtml이 true로 설정되어 있습니다.</param>
+        /// <param name="attachments">
+        /// 첨부파일 경로 배열 (PowerBuilder에서 string[] 형태로 만들어서 넘김). 
+        /// 배열이 null이거나 길이가 0이면 첨부 없음.
+        /// </param>
+        /// <param name="fromDisplayName">보내는 사람 표시 이름 (선택 사항)</param>
+        /// <param name="toDisplayName">받는 사람 표시 이름 (선택 사항, 여러 명일 경우 세미콜론으로 구분)</param>
+        /// <param name="replyTo">Reply-To 주소(들). 여러 명일 경우 ";" 또는 "," 로 구분</param>
+        /// <returns>성공 시 true, 실패 시 false</returns>
+        public bool SendMailWithAliasReplyTo(
+            string smtpServer,
+            int smtpPort,
+            string smtpUser,
+            string smtpPass,
+            bool useTLS,
+            string from,
+            string to,
+            string subject,
+            string body,
+            string[] attachments,
+            string fromDisplayName,
+            string toDisplayName,
+            string replyTo
+        )
+        {
+            return SendMailInternal(
+                smtpServer, smtpPort, smtpUser, smtpPass, useTLS,
+                from, to, subject, body, attachments,
+                fromDisplayName, toDisplayName, replyTo
+            );
         }
 
         private bool SendMailInternal(
@@ -312,7 +426,9 @@ namespace SimpleNetMail
             string body,
             string[] attachments,
             string fromDisplayName,
-            string toDisplayName)
+            string toDisplayName,
+            string replyTo
+        )
         {
             try
             {
@@ -360,6 +476,22 @@ namespace SimpleNetMail
                                     message.To.Add(new MailAddress(pair.Address));
                                 else
                                     message.To.Add(new MailAddress(pair.Address, pair.DisplayName));
+                            }
+                        }
+
+                        // Reply-To 설정 (표준 헤더)
+                        if (!string.IsNullOrWhiteSpace(replyTo))
+                        {
+                            string[] replyRecipients = replyTo
+                                .Split(new char[] { ';', ',' }, StringSplitOptions.RemoveEmptyEntries);
+
+                            foreach (string replyAddr in replyRecipients)
+                            {
+                                string addr = replyAddr.Trim();
+                                if (string.IsNullOrWhiteSpace(addr))
+                                    continue;
+
+                                message.ReplyToList.Add(new MailAddress(addr));
                             }
                         }
 
