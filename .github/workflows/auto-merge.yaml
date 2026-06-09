@@ -1,0 +1,139 @@
+name: Auto-merge on Repository Dispatch
+
+on:
+  repository_dispatch:
+    types: [auto-merge-pr]
+
+jobs:
+  auto-merge:
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+      contents: write
+      actions: write
+
+    steps:
+      - name: Get PR information
+        id: pr-info
+        uses: actions/github-script@v9
+        with:
+          script: |
+            const prNumber = context.payload.client_payload.pr_number;
+
+            if (!prNumber) {
+              core.setFailed('PR number not provided in client_payload');
+              return;
+            }
+
+            try {
+              const { data: pr } = await github.rest.pulls.get({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                pull_number: prNumber
+              });
+
+              core.setOutput('pr-number', pr.number);
+              core.setOutput('pr-title',  pr.title);
+              core.setOutput('pr-head-branch', pr.head.ref);
+              core.setOutput('pr-base-branch', pr.base.ref);
+
+              console.log(`Processing PR #${pr.number}: ${pr.title}`);
+              console.log(`From ${pr.head.ref} to ${pr.base.ref}`);
+
+              if (pr.state !== 'open') {
+                core.setFailed(`PR #${prNumber} is not open (state: ${pr.state})`);
+                return;
+              }
+
+              if (!pr.mergeable) {
+                core.setFailed(`PR #${prNumber} is not mergeable`);
+                return;
+              }
+
+              if (pr.mergeable_state === 'blocked') {
+                core.setFailed(`PR #${prNumber} is blocked from merging`);
+                return;
+              }
+
+              const { data: checks } = await github.rest.checks.listForRef({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                ref: pr.head.sha
+              });
+
+              const successful = checks.check_runs.filter(c =>
+                c.conclusion === 'success'
+              );
+
+              if (successful.length === 0) {
+                core.setFailed(`No successful CI checks found for PR #${prNumber}`);
+                return;
+              }
+
+              console.log(`PR #${prNumber} is ready for merge`);
+
+            } catch (error) {
+              console.error('Error getting PR information:', error.message);
+              core.setFailed(`Failed to get PR #${prNumber} information: ${error.message}`);
+            }
+
+      - name: Merge PR
+        id: merge-pr
+        uses: actions/github-script@v9
+        env:
+          PR_NUMBER: ${{ steps.pr-info.outputs.pr-number }}
+          PR_TITLE: ${{ steps.pr-info.outputs.pr-title }}
+        with:
+          script: |
+            const prNumber = parseInt(process.env.PR_NUMBER, 10);
+            const prTitle  = process.env.PR_TITLE;
+
+            try {
+              const result = await github.rest.pulls.merge({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                pull_number: prNumber,
+                merge_method: 'merge',
+                commit_title:   `Merge PR #${prNumber}: ${prTitle}`,
+                commit_message: 'Auto-merged by GitHub Actions workflow'
+              });
+
+              console.log(`Successfully merged PR #${prNumber}`);
+              console.log(`Merge SHA: ${result.data.sha}`);
+              core.setOutput('merge-sha', result.data.sha);
+
+            } catch (error) {
+              console.error('Failed to merge PR:', error.message);
+              core.setFailed(`Failed to merge PR #${prNumber}: ${error.message}`);
+            }
+
+      - name: Trigger CD workflow
+        uses: actions/github-script@v9
+        env:
+          PR_NUMBER: ${{ steps.pr-info.outputs.pr-number }}
+          MERGE_SHA: ${{ steps.merge-pr.outputs.merge-sha }}
+        with:
+          script: |
+            const prNumber = parseInt(process.env.PR_NUMBER, 10);
+            const mergeSha = process.env.MERGE_SHA;
+
+            try {
+              await github.rest.repos.createDispatchEvent({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                event_type: 'PR-merged',
+                client_payload: {
+                  pr_number:          prNumber,
+                  target_commit_sha:  mergeSha,
+                  merged_by:          'github-actions[bot]',
+                  merged_at:          new Date().toISOString()
+                }
+              });
+
+              console.log('Repository dispatch event sent to trigger CD workflow');
+              console.log(`PR #${prNumber} was merged successfully`);
+
+            } catch (error) {
+              console.error('Failed to trigger CD workflow:', error.message);
+              core.setFailed(`Failed to trigger CD workflow: ${error.message}`);
+            }

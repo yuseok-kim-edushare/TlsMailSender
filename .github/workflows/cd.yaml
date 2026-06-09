@@ -1,0 +1,115 @@
+name: Continuous Deployment
+
+on:
+  workflow_dispatch:
+  repository_dispatch:
+    types: [PR-merged]
+
+permissions:
+  contents: write
+  discussions: write
+
+jobs:
+  deploy:
+    runs-on: windows-2022
+    if: github.event_name == 'repository_dispatch' || github.event_name == 'workflow_dispatch'
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v6
+      with:
+        fetch-tags: true
+        fetch-depth: 0
+        ref: ${{ github.event_name == 'repository_dispatch' && github.event.client_payload.target_commit_sha || github.sha }}
+
+    - name: Get USERPROFILE and set CACHE_PATH
+      id: set_cache_path
+      shell: pwsh
+      run: |
+        $userProfile = [System.Environment]::GetEnvironmentVariable("USERPROFILE")
+        $cachePath = Join-Path $userProfile ".nuget\packages"
+        echo "CACHE_PATH=$cachePath" >> $env:GITHUB_ENV
+
+    - name: Cache NuGet packages
+      uses: actions/cache@v5
+      with:
+        path: |
+          ~/.nuget/packages
+          ${{ env.CACHE_PATH }}
+        key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj') }}
+        restore-keys: |
+          ${{ runner.os }}-nuget-
+
+    - name: Restore dependencies
+      run: dotnet restore TlsMailSender/TlsMailSender.csproj
+
+    - name: Build (Release)
+      run: dotnet build TlsMailSender/TlsMailSender.csproj --configuration Release --no-restore
+
+    # ── Generate type library (.tlb) for COM consumers ─────────────────────────
+    - name: Generate type library (TlsMailSender.tlb)
+      shell: pwsh
+      run: |
+        New-Item -ItemType Directory -Path ${{ github.workspace }}\release-files -Force
+
+        # Use the 32-bit RegAsm to produce a TLB compatible with 32-bit PB 2019 R3.
+        $regasm = "C:\Windows\Microsoft.NET\Framework\v4.0.30319\RegAsm.exe"
+        & $regasm "${{ github.workspace }}\TlsMailSender\release-files\net481\TlsMailSender.dll" `
+                  /tlb:"${{ github.workspace }}\release-files\TlsMailSender.tlb" `
+                  /nologo
+
+    # ── Auto-version based on latest tag + commit messages ────────────────────
+    - name: Get latest release version and generate release notes
+      id: get_latest_release
+      shell: pwsh
+      run: |
+        $latestRelease = ""
+        try {
+            $response = Invoke-RestMethod -Uri "https://api.github.com/repos/${{ github.repository }}/releases/latest" -ErrorAction Stop
+            $latestRelease = $response.tag_name
+        } catch {
+            Write-Host "No previous release found or API returned an error: $($_.Exception.Message)"
+        }
+        
+        if (-not $latestRelease) { $latestRelease = "0.0.0" }
+        Write-Output "Latest release version: $latestRelease"
+        echo "latest_release=$latestRelease" >> $env:GITHUB_ENV
+
+        $versionParts = $latestRelease.Split('.')
+        $versionParts[-1] = [int]$versionParts[-1] + 1
+        $newVersionString = $versionParts -join '.'
+
+        # Allow commit messages like "Update Version To 1.2.0" to override the patch bump.
+        $latestCommitMessages = (git log HEAD ^$latestRelease --pretty=%B 2>$null)
+        foreach ($line in $latestCommitMessages) {
+          if ($line -match "Update Version To (\d+\.\d+\.\d+)") {
+            $messageParts = $line -split ' '
+            $lastPart = $messageParts[-1]
+            $currentParts  = $newVersionString -split '\.' | ForEach-Object { [int]$_ }
+            $candidateParts = $lastPart          -split '\.' | ForEach-Object { [int]$_ }
+            $upgrade = $false
+            for ($i = 0; $i -lt [Math]::Min($currentParts.Count, $candidateParts.Count); $i++) {
+              if ($currentParts[$i] -lt $candidateParts[$i]) { $upgrade = $true; break }
+              elseif ($currentParts[$i] -gt $candidateParts[$i]) { break }
+            }
+            if ($upgrade) { $newVersionString = $lastPart }
+          }
+        }
+        echo "new_release=$newVersionString" >> $env:GITHUB_ENV
+
+        $releaseNotes  = "## Changes in $newVersionString`n"
+        $releaseNotes += (git log HEAD ^$latestRelease --oneline 2>$null) -join "`n"
+        $releaseNotes += "`n### Files changed`n"
+        $releaseNotes += (git diff HEAD ^$latestRelease --compact-summary 2>$null) -join "`n"
+        $releaseNotes | Out-File -FilePath releaseNotes.txt -Encoding utf8
+
+    - name: Create GitHub Release
+      uses: softprops/action-gh-release@b4309332981a82ec1c5618f44dd2e27cc8bfbfda # v3.0.0
+      with:
+        files: |
+          ${{ github.workspace }}\TlsMailSender\release-files\net481\TlsMailSender.dll
+          ${{ github.workspace }}\release-files\TlsMailSender.tlb
+          ${{ github.workspace }}\TlsMailSender\AllowedCerts.txt
+        tag_name: ${{ env.new_release }}
+        name: ${{ env.new_release }}
+        body_path: releaseNotes.txt

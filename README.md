@@ -1,5 +1,11 @@
 # SimpleNetMail: PowerBuilder용 TLS(STARTTLS) 메일 발송 라이브러리 (.NET DLL Import 및 COM 지원)
 
+*다른 언어로 읽기: [English](README.en.md)*
+
+[![CI Build](https://github.com/yuseok-kim-edushare/TlsMailSender/actions/workflows/ci.yaml/badge.svg)](https://github.com/yuseok-kim-edushare/TlsMailSender/actions/workflows/ci.yaml)
+
+---
+
 ## 프로젝트 소개
 
 이 프로젝트는 PowerBuilder에서 .NET Assembly Import(2019 R3 이상 지원) 또는 COM 방식으로 간편하게 TLS (STARTTLS) 암호화 연결로 이메일을 발송할 수 있도록 돕는 .NET Framework Class Library 입니다. 
