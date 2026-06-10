@@ -32,7 +32,7 @@
                  패키지 자체는 복원되어 $(PkgILRepack) 경로가 설정됩니다.
                  PrivateAssets=all  → 이 프로젝트를 참조하는 상위 프로젝트에 전파하지 않음
     -->
-    <PackageReference Include="ILRepack" Version="2.0.33">
+    <PackageReference Include="ILRepack" Version="2.0.45">
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>none</IncludeAssets>
     </PackageReference>
