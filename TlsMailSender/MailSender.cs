@@ -93,14 +93,15 @@ namespace SimpleNetMail
         /// 설정 파일에서 허용된 인증서 지문 목록을 로드합니다.
         /// 파일 위치: DLL과 같은 폴더의 AllowedCerts.txt
         /// 형식: 한 줄에 하나의 지문 (SHA-1 또는 SHA-256), #으로 시작하면 주석
+        /// net481은 관리 어셈블리 위치, Native AOT는 네이티브 라이브러리 디렉터리를 사용합니다.
         /// </summary>
         private static HashSet<string> LoadAllowedThumbprints()
         {
             var thumbprints = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             try
             {
-                string assemblyPath = Assembly.GetExecutingAssembly().Location;
-                string configPath = Path.Combine(Path.GetDirectoryName(assemblyPath), "AllowedCerts.txt");
+                string configDirectory = GetConfigDirectory();
+                string configPath = Path.Combine(configDirectory, "AllowedCerts.txt");
 
                 if (File.Exists(configPath))
                 {
@@ -132,6 +133,20 @@ namespace SimpleNetMail
                 LogStatic($"[화이트리스트] 로딩 실패: {ex.Message}");
             }
             return thumbprints;
+        }
+
+        /// <summary>
+        /// AllowedCerts.txt를 찾을 디렉터리입니다.
+        /// Native AOT 공유 라이브러리는 Assembly.Location이 비어 있으므로 AppContext.BaseDirectory를 사용합니다.
+        /// </summary>
+        private static string GetConfigDirectory()
+        {
+#if NET
+            return AppContext.BaseDirectory;
+#else
+            string assemblyPath = Assembly.GetExecutingAssembly().Location;
+            return Path.GetDirectoryName(assemblyPath);
+#endif
         }
 
         /// <summary>
@@ -176,7 +191,15 @@ namespace SimpleNetMail
                 {
                     if (!_callbackRegistered)
                     {
+                        // .NET 10 SmtpClient는 STARTTLS SslStream을 열 때 이 콜백을 그대로 읽습니다.
+                        // SYSLIB0014는 ServicePointManager 일반 사용에 대한 경고이며, 이 경로는 그대로 유지합니다.
+#if NET
+#pragma warning disable SYSLIB0014
+#endif
                         ServicePointManager.ServerCertificateValidationCallback = ValidateCertificate;
+#if NET
+#pragma warning restore SYSLIB0014
+#endif
                         _callbackRegistered = true;
                     }
                 }

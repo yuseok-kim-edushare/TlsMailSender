@@ -36,9 +36,14 @@ jobs:
         path: |
           ~/.nuget/packages
           ${{ env.CACHE_PATH }}
-        key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj') }}
+        key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj', 'Directory.Packages.props') }}
         restore-keys: |
           ${{ runner.os }}-nuget-
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v6
+      with:
+        dotnet-version: "10.0.x"
 
     - name: Restore dependencies
       run: dotnet restore TlsMailSender/TlsMailSender.csproj
@@ -57,6 +62,59 @@ jobs:
         & $regasm "${{ github.workspace }}\TlsMailSender\release-files\net481\TlsMailSender.dll" `
                   /tlb:"${{ github.workspace }}\release-files\TlsMailSender.tlb" `
                   /nologo
+
+    - name: Publish Native AOT (win-x64)
+      run: dotnet publish TlsMailSender/TlsMailSender.csproj -f net10.0-windows -r win-x64 -c Release --no-restore
+
+    - name: Publish Native AOT (win-x86)
+      run: dotnet publish TlsMailSender/TlsMailSender.csproj -f net10.0-windows -r win-x86 -c Release --no-restore
+
+    # GitHub Release 자산 이름은 파일명만 쓰므로 두 RID의 TlsMailSender.dll 이 충돌합니다.
+    # native-aot/win-x64, win-x86, 헤더를 한 zip 으로 첨부합니다.
+    - name: Stage Native AOT artifacts
+      shell: pwsh
+      run: |
+        $workspace = "${{ github.workspace }}"
+        $publishRoot = Join-Path $workspace "TlsMailSender\bin\Release\net10.0-windows"
+        $stageRoot = Join-Path $workspace "release-files\native-aot"
+        if (Test-Path $stageRoot) {
+          Remove-Item $stageRoot -Recurse -Force
+        }
+        New-Item -ItemType Directory -Path $stageRoot -Force | Out-Null
+        Copy-Item (Join-Path $workspace "samples\CppSample\TlsMailSender.h") (Join-Path $stageRoot "TlsMailSender.h") -Force
+
+        foreach ($rid in @("win-x64", "win-x86")) {
+          $publish = Join-Path $publishRoot "$rid\publish"
+          if (!(Test-Path $publish)) {
+            Write-Error "Native AOT publish output not found at: $publish"
+            exit 1
+          }
+          $dest = Join-Path $stageRoot $rid
+          $native = Join-Path $publishRoot "$rid\native"
+          New-Item -ItemType Directory -Path $dest -Force | Out-Null
+          foreach ($pattern in @("*.dll", "*.pdb")) {
+            Copy-Item (Join-Path $publish $pattern) $dest -Force -ErrorAction SilentlyContinue
+          }
+          # import lib(.lib/.exp)는 publish 폴더가 아니라 native 중간 출력에 생성됩니다.
+          if (Test-Path $native) {
+            foreach ($pattern in @("*.lib", "*.exp")) {
+              Copy-Item (Join-Path $native $pattern) $dest -Force -ErrorAction SilentlyContinue
+            }
+          }
+          if (!(Test-Path (Join-Path $dest "TlsMailSender.dll"))) {
+            Write-Error "TlsMailSender.dll was not produced for $rid"
+            exit 1
+          }
+        }
+
+        $zipPath = Join-Path $workspace "release-files\TlsMailSender-native-aot.zip"
+        if (Test-Path $zipPath) {
+          Remove-Item $zipPath -Force
+        }
+        Compress-Archive -Path (Join-Path $stageRoot "*") -DestinationPath $zipPath -Force
+        Get-ChildItem $stageRoot -Recurse -File | ForEach-Object {
+          Write-Host $_.FullName.Substring($stageRoot.Length)
+        }
 
     # ── Auto-version based on latest tag + commit messages ────────────────────
     - name: Get latest release version and generate release notes
@@ -110,6 +168,7 @@ jobs:
           ${{ github.workspace }}\TlsMailSender\release-files\net481\TlsMailSender.dll
           ${{ github.workspace }}\release-files\TlsMailSender.tlb
           ${{ github.workspace }}\TlsMailSender\AllowedCerts.txt
+          ${{ github.workspace }}\release-files\TlsMailSender-native-aot.zip
         tag_name: ${{ env.new_release }}
         name: ${{ env.new_release }}
         body_path: releaseNotes.txt

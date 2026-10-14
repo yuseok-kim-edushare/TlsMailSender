@@ -229,6 +229,24 @@ lb_result = dn_mailer.SendMailWithAlias( &
                 ls_to_alias )
 ```
 
+## Native AOT (MSVC++ interop)
+
+In addition to the PowerBuilder net481 DLL and TLB, the .NET 10 Native AOT shared library can be called from MSVC++ with `LoadLibraryW` / `GetProcAddress`. The calling convention is `__stdcall` and strings are UTF-16 (`wchar_t*`). The return value is `1` on success and `0` on failure. Failure details are written to `C:\temp\TlsMailSender.log`.
+
+The `TlsMailSender-native-aot.zip` release asset contains:
+
+*   `win-x64/TlsMailSender.dll` (plus pdb and the import lib when the SDK emits them)
+*   `win-x86/TlsMailSender.dll`
+*   `TlsMailSender.h` — function pointers for `SendMail`, `SendMailWithAliasReplyTo`, and `ReloadAllowedCerts`
+
+Call `SendMailWithReplyTo` and `SendMailWithAlias` through `SendMailWithAliasReplyTo` by passing null for the unused arguments. Separate attachment paths with `|`. Place `AllowedCerts.txt` in the directory the native DLL is loaded from (`AppContext.BaseDirectory`).
+
+Local publish and the C++ sample build are described in [`samples/CppSample/README.md`](samples/CppSample/README.md).
+
+```powershell
+dotnet publish TlsMailSender/TlsMailSender.csproj -f net10.0-windows -r win-x64 -c Release
+```
+
 ## Important Notes and Considerations
 
 *   **Certificate validation and AllowedCerts.txt**:
