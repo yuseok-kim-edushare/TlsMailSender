@@ -1,6 +1,8 @@
 <Project>
   <PropertyGroup>
     <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+    <!-- PackageReference 없이 PackageVersion 만으로 전이 패키지 버전을 고정합니다. -->
+    <CentralPackageTransitivePinningEnabled>true</CentralPackageTransitivePinningEnabled>
   </PropertyGroup>
 
   <ItemGroup>
@@ -9,7 +11,78 @@
     <PackageVersion Include="System.Runtime.CompilerServices.Unsafe" Version="6.1.2" />
     <PackageVersion Include="ILRepack" Version="2.0.48" />
     <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="18.11.0" />
-    <PackageVersion Include="Xunit.v3" Version="3.2.2" />
+    <!--
+      Xunit.v3 4.0.2 는 xunit.v3.mtp-v2 를 정확한 버전 [4.0.2] 로 요구하고,
+      assert, common, extensibility.core, runner.common, runner.inproc.console 도 같은 버전으로 고정됩니다.
+      하위 xunit.v3.* 는 이 패키지와 따로 올리지 않습니다.
+    -->
+    <PackageVersion Include="Xunit.v3" Version="4.0.2" />
     <PackageVersion Include="xunit.runner.visualstudio" Version="4.0.1" />
+
+    <!--
+      xunit.v3.runner.common 4.0.2 가 Microsoft.Win32.Registry 를 정확한 버전 [5.0.0] 으로 요구합니다.
+      NuGet 최신 안정 버전이 5.0.0 이라 그 버전에 맞춰 둡니다.
+      runner.common 가 범위를 풀기 전에는 이 버전을 넘길 수 없습니다.
+    -->
+    <PackageVersion Include="Microsoft.Win32.Registry" Version="5.0.0" />
+    <!--
+      xunit.v3.runner.common 4.0.2 가 System.Security.AccessControl 을 정확한 버전 [6.0.1] 로 요구합니다.
+      NuGet 최신 안정 버전이 6.0.1 이라 그 버전에 맞춰 둡니다.
+      runner.common 가 범위를 풀기 전에는 이 버전을 넘길 수 없습니다.
+    -->
+    <PackageVersion Include="System.Security.AccessControl" Version="6.0.1" />
+    <!--
+      Microsoft.Testing.Extensions.Telemetry 2.5.1,
+      Microsoft.Testing.Extensions.TrxReport.Abstractions 2.5.1,
+      Microsoft.Testing.Platform.MSBuild 2.5.1 이 Microsoft.Testing.Platform 을 [2.5.1, 3.0.0) 으로 제한합니다.
+      세 패키지는 xunit.v3.core.mtp-v2 4.0.2 가 가져옵니다.
+      현재 최신 안정 버전 2.5.1 은 범위 안입니다. 3.0.0 이상은 상위 패키지가 상한을 올리기 전에는 선택할 수 없습니다.
+    -->
+    <PackageVersion Include="Microsoft.Testing.Platform" Version="2.5.1" />
+
+    <!--
+      전이 의존성 핀. outdated 전이 패키지 중 상위 패키지 최소 버전보다 높은 최신 안정 버전입니다.
+      10.0.14 는 .NET 10.0.14 대역외 보안 릴리즈와 같은 패치 대역의 BCL 패키지입니다.
+    -->
+    <PackageVersion Include="Microsoft.ApplicationInsights" Version="3.2.0" />
+    <PackageVersion Include="Microsoft.Bcl.AsyncInterfaces" Version="10.0.14" />
+    <PackageVersion Include="Microsoft.TestPlatform.ObjectModel" Version="18.11.0" />
+    <PackageVersion Include="System.Collections.Immutable" Version="10.0.14" />
+    <PackageVersion Include="System.Diagnostics.DiagnosticSource" Version="10.0.14" />
+    <PackageVersion Include="System.Reflection.Metadata" Version="10.0.14" />
+    <PackageVersion Include="System.Threading.Tasks.Extensions" Version="4.6.3" />
+
+    <!-- Microsoft.ApplicationInsights 3.2.0 이 끌어오는 전이 패키지. 상위 조건은 최소 버전뿐이라 최신 안정 버전으로 고정합니다. -->
+    <PackageVersion Include="Microsoft.Extensions.Configuration" Version="10.0.14" />
+    <PackageVersion Include="Microsoft.Extensions.Configuration.Abstractions" Version="10.0.14" />
+    <PackageVersion Include="Microsoft.Extensions.Configuration.Binder" Version="10.0.14" />
+    <PackageVersion Include="Microsoft.Extensions.Configuration.EnvironmentVariables" Version="10.0.14" />
+    <PackageVersion Include="Microsoft.Extensions.DependencyInjection" Version="10.0.14" />
+    <PackageVersion Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.14" />
+    <PackageVersion Include="Microsoft.Extensions.Diagnostics.Abstractions" Version="10.0.14" />
+    <PackageVersion Include="Microsoft.Extensions.FileProviders.Abstractions" Version="10.0.14" />
+    <PackageVersion Include="Microsoft.Extensions.Hosting.Abstractions" Version="10.0.14" />
+    <PackageVersion Include="Microsoft.Extensions.Logging" Version="10.0.14" />
+    <PackageVersion Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.14" />
+    <PackageVersion Include="Microsoft.Extensions.Logging.Configuration" Version="10.0.14" />
+    <PackageVersion Include="Microsoft.Extensions.Options" Version="10.0.14" />
+    <PackageVersion Include="Microsoft.Extensions.Options.ConfigurationExtensions" Version="10.0.14" />
+    <PackageVersion Include="Microsoft.Extensions.Primitives" Version="10.0.14" />
+    <PackageVersion Include="Microsoft.Identity.Client" Version="4.91.1" />
+    <PackageVersion Include="Microsoft.Identity.Client.Extensions.Msal" Version="4.91.1" />
+    <PackageVersion Include="Microsoft.IdentityModel.Abstractions" Version="8.23.0" />
+    <PackageVersion Include="OpenTelemetry" Version="1.20.1" />
+    <PackageVersion Include="OpenTelemetry.Api" Version="1.20.1" />
+    <PackageVersion Include="OpenTelemetry.Api.ProviderBuilderExtensions" Version="1.20.1" />
+    <PackageVersion Include="OpenTelemetry.Extensions.Hosting" Version="1.20.1" />
+    <PackageVersion Include="OpenTelemetry.PersistentStorage.Abstractions" Version="1.1.3" />
+    <PackageVersion Include="OpenTelemetry.PersistentStorage.FileSystem" Version="1.1.3" />
+    <PackageVersion Include="System.Formats.Asn1" Version="10.0.14" />
+    <PackageVersion Include="System.IO.Pipelines" Version="10.0.14" />
+    <PackageVersion Include="System.Memory.Data" Version="10.0.14" />
+    <PackageVersion Include="System.Net.ServerSentEvents" Version="10.0.14" />
+    <PackageVersion Include="System.Security.Cryptography.ProtectedData" Version="10.0.14" />
+    <PackageVersion Include="System.Text.Encodings.Web" Version="10.0.14" />
+    <PackageVersion Include="System.Text.Json" Version="10.0.14" />
   </ItemGroup>
 </Project>
