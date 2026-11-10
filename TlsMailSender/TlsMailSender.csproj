@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFrameworks>net481;net10.0-windows</TargetFrameworks>
+    <TargetFrameworks>net481;net11.0-windows</TargetFrameworks>
     <OutputType>Library</OutputType>
     <RootNamespace>TlsMailSender</RootNamespace>
     <AssemblyName>TlsMailSender</AssemblyName>
@@ -11,14 +11,14 @@
 
     <!--
       Release + net481 빌드에서만 NuGet 의존 DLL을 출력 폴더에 복사합니다.
-      Debug 빌드와 net10.0-windows 게시에서는 복사하지 않습니다.
+      Debug 빌드와 net11.0-windows 게시에서는 복사하지 않습니다.
       ILRepack이 $(OutputPath)에서 입력 파일을 읽으려면 이 플래그가 필요합니다.
     -->
     <CopyLocalLockFileAssemblies Condition="'$(Configuration)' == 'Release' AND '$(TargetFramework)' == 'net481'">true</CopyLocalLockFileAssemblies>
   </PropertyGroup>
 
-  <!-- Native AOT / C-Export: net10.0-windows 게시 시에만 네이티브 공유 라이브러리를 만듭니다. -->
-  <PropertyGroup Condition="'$(TargetFramework)' == 'net10.0-windows'">
+  <!-- Native AOT / C-Export: net11.0-windows 게시 시에만 네이티브 공유 라이브러리를 만듭니다. -->
+  <PropertyGroup Condition="'$(TargetFramework)' == 'net11.0-windows'">
     <PublishAot>true</PublishAot>
     <NativeLib>Shared</NativeLib>
     <SelfContained>true</SelfContained>
@@ -36,7 +36,7 @@
   <!--
     System.Memory : Span/ReadOnlySpan/AsSpan — net481 BCL 미포함
     System.Buffers : ArrayPool — 첨부파일 버퍼 풀링으로 LOH·단편화 완화
-    net10.0-windows 에는 인박스이므로 net481 에서만 참조합니다.
+    net11.0-windows 에는 인박스이므로 net481 에서만 참조합니다.
   -->
   <ItemGroup Condition="'$(TargetFramework)' == 'net481'">
     <PackageReference Include="System.Memory" />

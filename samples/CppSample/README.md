@@ -1,6 +1,6 @@
 # TlsMailSender C++ 샘플
 
-`TlsMailSender.dll`(net10.0-windows, Native AOT `NativeLib=Shared` 게시물)을
+`TlsMailSender.dll`(net11.0-windows, Native AOT `NativeLib=Shared` 게시물)을
 `LoadLibraryW`/`GetProcAddress`로 동적 로드해 `SendMail`/`SendMailWithAliasReplyTo`/
 `ReloadAllowedCerts` 내보내기 함수를 `__stdcall`로 호출하는 최소 예제입니다.
 
@@ -11,10 +11,10 @@
 ## 사전 준비: 네이티브 라이브러리 게시
 
 ```powershell
-dotnet publish ..\..\TlsMailSender\TlsMailSender.csproj -f net10.0-windows -r win-x64 -c Release
+dotnet publish ..\..\TlsMailSender\TlsMailSender.csproj -f net11.0-windows -r win-x64 -c Release
 ```
 
-게시 결과(`TlsMailSender\bin\Release\net10.0-windows\win-x64\publish\TlsMailSender.dll`)를
+게시 결과(`TlsMailSender\bin\Release\net11.0-windows\win-x64\publish\TlsMailSender.dll`)를
 이 샘플의 실행 파일과 같은 폴더로 복사해야 합니다. 32비트 호스트는 `-r win-x86` 게시물을 사용합니다.
 
 사설 인증서를 허용하려면 `AllowedCerts.txt`를 네이티브 DLL과 같은 폴더(프로세스의 `AppContext.BaseDirectory`)에 둡니다.
@@ -35,7 +35,7 @@ cl /EHsc /std:c++17 /utf-8 /DUNICODE /D_UNICODE main.cpp /Fe:TlsMailSenderCppSam
 ## 실행
 
 ```powershell
-copy ..\..\TlsMailSender\bin\Release\net10.0-windows\win-x64\publish\TlsMailSender.dll build\Release\
+copy ..\..\TlsMailSender\bin\Release\net11.0-windows\win-x64\publish\TlsMailSender.dll build\Release\
 build\Release\TlsMailSenderCppSample.exe smtp.example.com 25 user@example.com secret 1 user@example.com dest@example.com "제목" "본문" "C:\temp\a.txt|C:\temp\b.txt"
 ```
 

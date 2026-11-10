@@ -6,7 +6,7 @@ using System.Runtime.InteropServices;
 namespace SimpleNetMail
 {
     /// <summary>
-    /// Native AOT(C-Export) 진입점. net10.0-windows(NativeLib=Shared) 게시 시
+    /// Native AOT(C-Export) 진입점. net11.0-windows(NativeLib=Shared) 게시 시
     /// UTF-16(wchar_t*) 포인터로 MSVC++에서 __stdcall 호출할 수 있는 함수를 노출합니다.
     /// 반환값은 1(성공) 또는 0(실패)입니다. 실패 상세는 C:\temp\TlsMailSender.log 에 남습니다.
     /// </summary>

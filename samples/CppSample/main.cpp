@@ -1,9 +1,9 @@
 // TlsMailSender C++ 샘플
-// Native AOT로 게시된 TlsMailSender.dll(net10.0-windows, NativeLib=Shared)을
+// Native AOT로 게시된 TlsMailSender.dll(net11.0-windows, NativeLib=Shared)을
 // LoadLibraryW/GetProcAddress로 동적 로드하여 호출하는 예제.
 //
 // 빌드 전 준비:
-//   dotnet publish ..\..\TlsMailSender\TlsMailSender.csproj -f net10.0-windows -r win-x64 -c Release
+//   dotnet publish ..\..\TlsMailSender\TlsMailSender.csproj -f net11.0-windows -r win-x64 -c Release
 //   위 게시 결과의 TlsMailSender.dll 을 이 실행 파일과 같은 폴더에 복사한다.
 //
 // 사용법:

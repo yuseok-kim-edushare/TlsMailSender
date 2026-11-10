@@ -3,7 +3,7 @@
 #include <windows.h>
 
 // TlsMailSender Native AOT 공유 라이브러리의 C ABI.
-// net10.0-windows, NativeLib=Shared 로 게시한 TlsMailSender.dll 을
+// net11.0-windows, NativeLib=Shared 로 게시한 TlsMailSender.dll 을
 // LoadLibraryW / GetProcAddress 로 호출합니다.
 //
 // 문자열은 UTF-16(널 종료)이며 Windows wchar_t* 와 같습니다.

@@ -191,7 +191,7 @@ namespace SimpleNetMail
                 {
                     if (!_callbackRegistered)
                     {
-                        // .NET 10 SmtpClient는 STARTTLS SslStream을 열 때 이 콜백을 그대로 읽습니다.
+                        // .NET 11 SmtpClient는 STARTTLS SslStream을 열 때 이 콜백을 그대로 읽습니다.
                         // SYSLIB0014는 ServicePointManager 일반 사용에 대한 경고이며, 이 경로는 그대로 유지합니다.
 #if NET
 #pragma warning disable SYSLIB0014

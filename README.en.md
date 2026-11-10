@@ -231,7 +231,7 @@ lb_result = dn_mailer.SendMailWithAlias( &
 
 ## Native AOT (MSVC++ interop)
 
-In addition to the PowerBuilder net481 DLL and TLB, the .NET 10 Native AOT shared library can be called from MSVC++ with `LoadLibraryW` / `GetProcAddress`. The calling convention is `__stdcall` and strings are UTF-16 (`wchar_t*`). The return value is `1` on success and `0` on failure. Failure details are written to `C:\temp\TlsMailSender.log`.
+In addition to the PowerBuilder net481 DLL and TLB, the .NET 11 Native AOT shared library can be called from MSVC++ with `LoadLibraryW` / `GetProcAddress`. The calling convention is `__stdcall` and strings are UTF-16 (`wchar_t*`). The return value is `1` on success and `0` on failure. Failure details are written to `C:\temp\TlsMailSender.log`.
 
 The `TlsMailSender-native-aot.zip` release asset contains:
 
@@ -244,7 +244,7 @@ Call `SendMailWithReplyTo` and `SendMailWithAlias` through `SendMailWithAliasRep
 Local publish and the C++ sample build are described in [`samples/CppSample/README.md`](samples/CppSample/README.md).
 
 ```powershell
-dotnet publish TlsMailSender/TlsMailSender.csproj -f net10.0-windows -r win-x64 -c Release
+dotnet publish TlsMailSender/TlsMailSender.csproj -f net11.0-windows -r win-x64 -c Release
 ```
 
 ## Important Notes and Considerations

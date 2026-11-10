@@ -43,7 +43,7 @@ jobs:
     - name: Setup .NET
       uses: actions/setup-dotnet@v6
       with:
-        dotnet-version: "10.0.x"
+        dotnet-version: "11.0.x"
 
     - name: Restore dependencies
       run: dotnet restore TlsMailSender/TlsMailSender.csproj
@@ -64,10 +64,10 @@ jobs:
                   /nologo
 
     - name: Publish Native AOT (win-x64)
-      run: dotnet publish TlsMailSender/TlsMailSender.csproj -f net10.0-windows -r win-x64 -c Release --no-restore
+      run: dotnet publish TlsMailSender/TlsMailSender.csproj -f net11.0-windows -r win-x64 -c Release --no-restore
 
     - name: Publish Native AOT (win-x86)
-      run: dotnet publish TlsMailSender/TlsMailSender.csproj -f net10.0-windows -r win-x86 -c Release --no-restore
+      run: dotnet publish TlsMailSender/TlsMailSender.csproj -f net11.0-windows -r win-x86 -c Release --no-restore
 
     # GitHub Release 자산 이름은 파일명만 쓰므로 두 RID의 TlsMailSender.dll 이 충돌합니다.
     # native-aot/win-x64, win-x86, 헤더를 한 zip 으로 첨부합니다.
@@ -75,7 +75,7 @@ jobs:
       shell: pwsh
       run: |
         $workspace = "${{ github.workspace }}"
-        $publishRoot = Join-Path $workspace "TlsMailSender\bin\Release\net10.0-windows"
+        $publishRoot = Join-Path $workspace "TlsMailSender\bin\Release\net11.0-windows"
         $stageRoot = Join-Path $workspace "release-files\native-aot"
         if (Test-Path $stageRoot) {
           Remove-Item $stageRoot -Recurse -Force
